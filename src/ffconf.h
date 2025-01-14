@@ -39,15 +39,15 @@
 /  f_findfirst() and f_findnext(). (0:Disable or 1:Enable) */
 
 
-#define	_USE_MKFS		0
+#define	_USE_MKFS		1
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
-#define	_USE_FASTSEEK	0
+#define	_USE_FASTSEEK	1
 /* This option switches fast seek feature. (0:Disable or 1:Enable) */
 
 
-#define _USE_LABEL		0
+#define _USE_LABEL		1
 /* This option switches volume label functions, f_getlabel() and f_setlabel().
 /  (0:Disable or 1:Enable) */
 
@@ -61,7 +61,7 @@
 / Locale and Namespace Configurations
 /---------------------------------------------------------------------------*/
 
-#define _CODE_PAGE	932
+#define _CODE_PAGE	866
 /* This option specifies the OEM code page to be used on the target system.
 /  Incorrect setting of the code page can cause a file open failure.
 /
@@ -90,7 +90,7 @@
 */
 
 
-#define	_USE_LFN	0
+#define	_USE_LFN	2
 #define	_MAX_LFN	255
 /* The _USE_LFN option switches the LFN feature.
 /
@@ -124,7 +124,7 @@
 /  When _LFN_UNICODE is 0, this option has no effect. */
 
 
-#define _FS_RPATH	0
+#define _FS_RPATH	2
 /* This option configures relative path feature.
 /
 /   0: Disable relative path feature and remove related functions.
@@ -138,12 +138,12 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
-#define _VOLUMES	1
+#define _VOLUMES	8
 /* Number of volumes (logical drives) to be used. */
 
 
 #define _STR_VOLUME_ID	0
-#define _VOLUME_STRS	"RAM","NAND","CF","SD1","SD2","USB1","USB2","USB3"
+#define _VOLUME_STRS	"SD","SD1","SD2","SD3","IDE","IDE1","IDE2","IDE3"
 /* _STR_VOLUME_ID option switches string volume ID feature.
 /  When _STR_VOLUME_ID is set to 1, also pre-defined strings can be used as drive
 /  number in the path name. _VOLUME_STRS defines the drive ID strings for each
@@ -151,7 +151,7 @@
 /  the drive ID strings are: A-Z and 0-9. */
 
 
-#define	_MULTI_PARTITION	0
+#define	_MULTI_PARTITION	1
 /* This option switches multi-partition feature. By default (0), each logical drive
 /  number is bound to the same physical drive number and only an FAT volume found on
 /  the physical drive will be mounted. When multi-partition feature is enabled (1),
@@ -228,7 +228,7 @@
 
 #define _FS_REENTRANT	0
 #define _FS_TIMEOUT		1000
-#define	_SYNC_t			HANDLE
+#define	_SYNC_t			void *
 /* The _FS_REENTRANT option switches the re-entrancy (thread safe) of the FatFs
 /  module itself. Note that regardless of this option, file access to different
 /  volume is always re-entrant and volume control functions, f_mount(), f_mkfs()
