@@ -5,6 +5,7 @@
 / following conditions.
 /
 / Copyright (C) 2015, ChaN, all right reserved.
+/ Copyright (C) 2025 Ruslan Rostovtsev
 /
 / 1. Redistributions of source code must retain the above copyright notice,
 /    this condition and the following disclaimer.
@@ -104,7 +105,7 @@ typedef struct {
 	DWORD	dirbase;		/* Root directory start sector (FAT32:Cluster#) */
 	DWORD	database;		/* Data start sector */
 	DWORD	winsect;		/* Current sector appearing in the win[] */
-	BYTE	win[_MAX_SS];	/* Disk access window for Directory, FAT (and file data at tiny cfg) */
+	BYTE	win[_MAX_SS] __attribute__((aligned(32)));	/* Disk access window for Directory, FAT (and file data at tiny cfg) */
 } FATFS;
 
 
@@ -132,7 +133,7 @@ typedef struct {
 	UINT	lockid;			/* File lock ID origin from 1 (index of file semaphore table Files[]) */
 #endif
 #if !_FS_TINY
-	BYTE	buf[_MAX_SS];	/* File private data read/write window */
+	BYTE	buf[_MAX_SS] __attribute__((aligned(32)));	/* File private data read/write window */
 #endif
 } FIL;
 
