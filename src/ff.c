@@ -503,6 +503,15 @@ static const BYTE ExCvt[] = _EXCVT;	/* Upper conversion table for SBCS extended 
 /* String functions                                                      */
 /*-----------------------------------------------------------------------*/
 
+#ifdef _arch_dreamcast
+
+#include <string.h>
+
+#define mem_cpy(dst, src, cnt) memcpy(dst, src, cnt)
+#define mem_set(dst, val, cnt) memset(dst, val, cnt)
+#define mem_cmp(dst, src, cnt) memcmp(dst, src, cnt)
+
+#else
 /* Copy memory to memory */
 static
 void mem_cpy (void* dst, const void* src, UINT cnt) {
@@ -538,6 +547,7 @@ int mem_cmp (const void* dst, const void* src, UINT cnt) {
 	while (cnt-- && (r = *d++ - *s++) == 0) ;
 	return r;
 }
+#endif
 
 /* Check if chr is contained in the string */
 static
