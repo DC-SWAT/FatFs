@@ -8,6 +8,9 @@ FatFs is a generic FAT file system module for small embedded systems. This versi
 make
 ```
 
+## Usage
+You only need to call `fs_fat_mount_sd()` and/or `fs_fat_mount_ide()` to automatically mount all FAT partitions on the corresponding devices. Additionally, you can use other block devices by invoking `fs_fat_mount()` with the appropriate parameters for the target device.
+
 ## Links
 - DreamShell: https://github.com/DC-SWAT/DreamShell
 - KallistiOS: https://github.com/KallistiOS/KallistiOS

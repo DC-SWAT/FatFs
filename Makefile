@@ -5,7 +5,12 @@
 #
 
 TARGET = libfatfs.a
-OBJS = src/ff.o
-KOS_CFLAGS += -Isrc -Iinclude
+OBJS = src/option/ccsbcs.o \
+		src/option/syscall.o \
+		src/ff.o \
+		src/dc.o \
+		src/dc_bdev.o
+
+KOS_CFLAGS += -W -Wextra -pedantic -Isrc -Iinclude
 
 include $(KOS_BASE)/addons/Makefile.prefab
