@@ -37,8 +37,8 @@
 #include <arch/rtc.h>
 #include <dc/g1ata.h>
 #include <dc/sd.h>
+#include <fatfs.h>
 
-#include "fatfs.h"
 #include "diskio.h"
 #include "ff.h"
 #include "integer.h"
