@@ -852,18 +852,12 @@ DRESULT disk_read (
     int rv;
 
     if (count > 1 && mnt->dev_dma) {
-#ifdef FATFS_USE_DMA_BUF
-        if ((uintptr_t)buff & 31) {
-            if (count <= mnt->fs->csize) {
-                dest = mnt->dmabuf;
-            }
-            else {
-                dest = (uint8_t *)memalign(32, count << dev->l_block_size);
-            }
-        }
-        dev = mnt->dev_dma;
-#else
         if (((uintptr_t)buff & 31) == 0) {
+            dev = mnt->dev_dma;
+        }
+#ifdef FATFS_USE_DMA_BUF
+        else if (count <= mnt->fs->csize) {
+            dest = mnt->dmabuf;
             dev = mnt->dev_dma;
         }
 #endif
@@ -878,10 +872,6 @@ DRESULT disk_read (
 #ifdef FATFS_USE_DMA_BUF
     if (dest != buff) {
         memcpy(buff, dest, count << dev->l_block_size);
-
-        if (dest != mnt->dmabuf) {
-            free(dest);
-        }
     }
 #endif
 
@@ -911,20 +901,14 @@ DRESULT disk_write (
     int rv;
 
     if (count > 1 && mnt->dev_dma) {
-#ifdef FATFS_USE_DMA_BUF
-        if ((uintptr_t)buff & 31) {
-            if (count <= mnt->fs->csize) {
-                src = mnt->dmabuf;
-            }
-            else {
-                src = (uint8_t *)memalign(32, count << dev->l_block_size);
-            }
-            memcpy(src, buff, count << dev->l_block_size);
-        }
-        dev = mnt->dev_dma;
-#else
         if (((uintptr_t)buff & 31) == 0) {
             dev = mnt->dev_dma;
+        }
+#ifdef FATFS_USE_DMA_BUF
+        else if (count <= mnt->fs->csize) {
+            src = mnt->dmabuf;
+            dev = mnt->dev_dma;
+            memcpy(src, buff, count << dev->l_block_size);
         }
 #endif
     }
@@ -934,12 +918,6 @@ DRESULT disk_write (
         sector, (int)count, (uintptr_t)buff, (uintptr_t)src));
 
     rv = dev->write_blocks(dev, sector, count, src);
-
-#ifdef FATFS_USE_DMA_BUF
-    if (src != buff && src != mnt->dmabuf) {
-        free(src);
-    }
-#endif
 
     if (rv < 0) {
         DBG((DBG_ERROR, "FATFS: %s[%d] %s error: %d\n",
