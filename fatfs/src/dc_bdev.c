@@ -297,3 +297,55 @@ int fs_fat_mount_ide() {
     }
     return 0;
 }
+
+/* Unmount and cleanup SD devices */
+void fs_fat_unmount_sd(void) {
+    if (sd_dev != NULL) {
+        for (int i = 0; i < MAX_PARTITIONS; i++) {
+            if (sd_dev[i].dev_data != NULL) {
+                char path[16];
+                if (i == 0) {
+                    strcpy(path, "/sd");
+                }
+                else {
+                    sprintf(path, "/sd%d", i);
+                }
+                fs_fat_unmount(path);
+                sd_dev[i].shutdown(&sd_dev[i]);
+            }
+        }
+        free(sd_dev);
+        sd_dev = NULL;
+    }
+}
+
+/* Unmount and cleanup IDE devices */
+void fs_fat_unmount_ide(void) {
+    if (g1_dev != NULL) {
+        for (int i = 0; i < MAX_PARTITIONS; i++) {
+            if (g1_dev[i].dev_data != NULL) {
+                char path[16];
+                if (i == 0) {
+                    strcpy(path, "/ide");
+                }
+                else {
+                    sprintf(path, "/ide%d", i);
+                }
+                fs_fat_unmount(path);
+                g1_dev[i].shutdown(&g1_dev[i]);
+            }
+        }
+        free(g1_dev);
+        g1_dev = NULL;
+    }
+
+    if (g1_dev_dma != NULL) {
+        for (int i = 0; i < MAX_PARTITIONS; i++) {
+            if (g1_dev_dma[i].dev_data != NULL) {
+                g1_dev_dma[i].shutdown(&g1_dev_dma[i]);
+            }
+        }
+        free(g1_dev_dma);
+        g1_dev_dma = NULL;
+    }
+}
