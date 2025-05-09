@@ -1232,6 +1232,11 @@ int fs_fat_shutdown(void) {
     if (!initted) {
         return 0;
     }
+
+    /* Clean up SD and IDE resources */
+    fs_fat_unmount_sd();
+    fs_fat_unmount_ide();
+
     for (i = 0; i < MAX_FAT_MOUNTS; ++i) {
 
         if (fat_mnt[i].dev != NULL) {
