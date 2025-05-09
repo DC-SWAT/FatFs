@@ -15,13 +15,30 @@ cp -R include fatfs /opt/toolchains/dc/kos/addons
 make
 ```
 
+### Build Options
+You can customize the build with the following options:
+- `DEBUG=1` - Enable debug output (disabled by default)
+- `DMA_BUF=0` - Disable DMA buffer (enabled by default)
+- `SD_CHECK_CRC=1` - Enable CRC checking for SD cards (disabled by default)
+
+Examples:
+```console
+# Build with defaults
+make
+
+# Build with CRC checking for SD cards
+make SD_CHECK_CRC=1
+
+# Build without DMA buffer
+make DMA_BUF=0
+```
+
 ## Usage
 - Add `#include <fatfs.h>` in your C source file.
 - Add `-lfatfs` in your `Makefile` on the line which builds your program, e.g.:
   - `kos-cc -o $(TARGET) $(OBJS) -lfatfs`
 - Simply call `fs_fat_mount_sd()` to mount a FAT partition to `/sd` and/or call `fs_fat_mount_ide()` to mount a FAT partition to `/ide`.
 - Additionally, you can use other block devices by calling `fs_fat_mount()` with the appropriate parameters for the target device -- see `fatfs.h` for more information.
-- To reduce memory usage you can disable DMA buffer, look in `Makefile`.
 
 ## Links
 - DreamShell: https://github.com/DC-SWAT/DreamShell
