@@ -96,6 +96,8 @@ int fs_fat_is_mounted(const char *mp);
 
 /**
  * \brief Initialize the FAT and SD card, then mount all partitions on it.
+ * This function will try to detect and mount both SCIF and SCI interfaces
+ * if they are available.
  *
  * \return 0 on success, or a negative value if an error occurred.
  */
