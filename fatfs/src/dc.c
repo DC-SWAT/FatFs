@@ -1127,30 +1127,34 @@ int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio, kos_blockdev_t *dev_dm
         goto error;
     }
 
+    uint32_t sect_size = (1 << mnt->dev->l_block_size);
+
 #ifdef FATFS_USE_DMA_BUF
     if (mnt->dev_dma) {
-        DBG((DBG_DEBUG, "FATFS: Allocating %d bytes for DMA buffer\n", mnt->fs->csize * _MAX_SS));
-        if (!(mnt->dmabuf = (uint8_t *)memalign(32, mnt->fs->csize * _MAX_SS))) {
+        DBG((DBG_DEBUG, "FATFS: Allocating %d bytes for DMA buffer\n", mnt->fs->csize * sect_size));
+        if (!(mnt->dmabuf = (uint8_t *)memalign(32, mnt->fs->csize * sect_size))) {
             dbglog(DBG_ERROR, "FATFS: Out of memory for DMA buffer\n");
         }
         else {
             DBG((DBG_DEBUG, "FATFS: Allocated %d bytes for DMA buffer at %p\n",
-                mnt->fs->csize * _MAX_SS, mnt->dmabuf));
+                mnt->fs->csize * sect_size, mnt->dmabuf));
         }
     }
 #endif
 
     FATFS *fs;
-    DWORD fre_clust, fre_sect, tot_sect;
+    DWORD fre_clust;
+    uint64_t fre_sect, tot_sect;
     rc = f_getfree(mnt->dev_path, &fre_clust, &fs);
 
     /* Get total sectors and free sectors */
-    tot_sect = (fs->n_fatent - 2) * fs->csize;
+    tot_sect = mnt->dev->count_blocks(mnt->dev);
     fre_sect = fre_clust * fs->csize;
 
     if (rc == FR_OK) {
-        dbglog(DBG_DEBUG, "FATFS: %lu KiB total drive space and %lu KiB available.\n",
-                tot_sect / 2, fre_sect / 2);
+        dbglog(DBG_DEBUG, "FATFS: %lu MB total, %lu MB free.\n",
+                (uint32_t)((tot_sect * sect_size) / 1024 / 1024), 
+                (uint32_t)((fre_sect * sect_size) / 1024 / 1024));
     }
 
     DBG((DBG_DEBUG, "FATFS: FAT start sector: %ld\n", mnt->fs->fatbase));
