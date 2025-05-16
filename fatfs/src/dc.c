@@ -396,10 +396,16 @@ static ssize_t fat_read(void *hnd, void *buffer, size_t size) {
     FAT_GET_HND(hnd, -1);
 
     if (sf->fil.cltbl == NULL &&
-        (sf->mode & O_MODE_MASK) == O_RDONLY)
+        (sf->mode & O_MODE_MASK) == O_RDONLY &&
+        f_size(&sf->fil) > (DWORD)(sf->mnt->fs->csize * (1 << sf->mnt->dev->l_block_size)))
     {
-        /* Using fast seek feature */
+        /* Using fast seek feature for files larger than the cluster size */
         rc = fat_create_linkmap(sf);
+    }
+
+    /* We can use first fs_read just for preparing fast seek feature */
+    if(size == 0) {
+        return 0;
     }
 
     rc = f_read(&sf->fil, buffer, (UINT) size, &rs);
