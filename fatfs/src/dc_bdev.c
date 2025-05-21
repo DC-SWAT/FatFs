@@ -38,6 +38,7 @@
 #include <dc/g1ata.h>
 #include <dc/sd.h>
 #include <dc/scif.h>
+#include <kos/dbglog.h>
 #include <fatfs.h>
 
 #define MAX_PARTITIONS 4

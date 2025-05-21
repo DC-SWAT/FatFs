@@ -37,6 +37,7 @@
 #include <arch/rtc.h>
 #include <dc/g1ata.h>
 #include <dc/sd.h>
+#include <kos/dbglog.h>
 #include <kos/fs.h>
 #include <kos/mutex.h>
 #include <fatfs.h>
