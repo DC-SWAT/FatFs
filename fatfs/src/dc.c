@@ -731,7 +731,7 @@ static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, 
     (void)flag;
 
     memset(st, 0, sizeof(struct stat));
-    st->st_dev = (dev_t)((ptr_t)vfs);
+    st->st_dev = (dev_t)((uintptr_t)vfs);
     st->st_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IXUSR | S_IXGRP | S_IXOTH;
     st->st_nlink = 1;
 
@@ -780,7 +780,7 @@ static int fat_fstat(void *hnd, struct stat *st) {
 
     st->st_nlink = 1;
     st->st_blksize = 1 << sf->mnt->dev->l_block_size;
-    st->st_dev = (dev_t)((ptr_t)sf->mnt->dev);
+    st->st_dev = (dev_t)((uintptr_t)sf->mnt->dev);
     st->st_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IXUSR | S_IXGRP | S_IXOTH;
 
     if (sf->type == STAT_TYPE_DIR) {
