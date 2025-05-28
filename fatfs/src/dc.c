@@ -908,7 +908,7 @@ DRESULT disk_write (
     uint8_t *src = (uint8_t *)buff;
     kos_blockdev_t *dev = mnt->dev;
     int rv;
-
+#if 0 /* FIXME: DMA write breaks GD-drive syscalls (?) */
     if (count > 1 && mnt->dev_dma) {
         if (((uintptr_t)buff & 31) == 0) {
             dev = mnt->dev_dma;
@@ -921,7 +921,7 @@ DRESULT disk_write (
         }
 #endif
     }
-
+#endif
     DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d 0x%08lx 0x%08lx\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
         sector, (int)count, (uintptr_t)buff, (uintptr_t)src));
@@ -1141,10 +1141,6 @@ int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio, kos_blockdev_t *dev_dm
         DBG((DBG_DEBUG, "FATFS: Allocating %d bytes for DMA buffer\n", mnt->fs->csize * sect_size));
         if (!(mnt->dmabuf = (uint8_t *)memalign(32, mnt->fs->csize * sect_size))) {
             dbglog(DBG_ERROR, "FATFS: Out of memory for DMA buffer\n");
-        }
-        else {
-            DBG((DBG_DEBUG, "FATFS: Allocated %d bytes for DMA buffer at %p\n",
-                mnt->fs->csize * sect_size, mnt->dmabuf));
         }
     }
 #endif
