@@ -362,12 +362,12 @@ static int fat_close(void *hnd) {
     sf->used = 0;
     FRESULT rc = FR_OK;
 
-    DBG((DBG_ERROR, "FATFS: Closing file - %d\n", fd));
+    DBG((DBG_DEBUG, "FATFS: Closing file - %d\n", fd));
 
     switch (sf->type) {
         case STAT_TYPE_FILE:
             if (sf->fil.cltbl != (DWORD*)&sf->lktbl && sf->fil.cltbl != NULL) {
-                DBG((DBG_ERROR, "FATFS: Freeing linktable\n"));
+                DBG((DBG_DEBUG, "FATFS: Freeing linktable\n"));
                 free(sf->fil.cltbl);
             }
             rc = f_close(&sf->fil);
@@ -872,9 +872,9 @@ DRESULT disk_read (
 #endif
     }
 
-    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d 0x%08lx 0x%08lx\n",
+    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d %p %p\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
-        sector, (int)count, (uintptr_t)buff, (uintptr_t)dest));
+        sector, (int)count, (void *)buff, (void *)dest));
 
     rv = dev->read_blocks(dev, sector, count, dest);
 
@@ -922,9 +922,9 @@ DRESULT disk_write (
 #endif
     }
 #endif
-    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d 0x%08lx 0x%08lx\n",
+    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d %p %p\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
-        sector, (int)count, (uintptr_t)buff, (uintptr_t)src));
+        sector, (int)count, (const void *)buff, (const void *)src));
 
     rv = dev->write_blocks(dev, sector, count, src);
 
@@ -1138,7 +1138,7 @@ int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio, kos_blockdev_t *dev_dm
 
 #ifdef FATFS_USE_DMA_BUF
     if (mnt->dev_dma) {
-        DBG((DBG_DEBUG, "FATFS: Allocating %d bytes for DMA buffer\n", mnt->fs->csize * sect_size));
+        DBG((DBG_DEBUG, "FATFS: Allocating %lu bytes for DMA buffer\n", (unsigned long)(mnt->fs->csize * sect_size)));
         if (!(mnt->dmabuf = (uint8_t *)memalign(32, mnt->fs->csize * sect_size))) {
             dbglog(DBG_ERROR, "FATFS: Out of memory for DMA buffer\n");
         }
@@ -1235,9 +1235,6 @@ int fs_fat_init(void) {
 }
 
 int fs_fat_shutdown(void) {
-    int i;
-    fatfs_mnt_t *mnt;
-
     if (!initted) {
         return 0;
     }
@@ -1246,15 +1243,6 @@ int fs_fat_shutdown(void) {
     fs_fat_unmount_sd();
     fs_fat_unmount_ide();
 
-    for (i = 0; i < MAX_FAT_MOUNTS; ++i) {
-
-        if (fat_mnt[i].dev != NULL) {
-
-            mnt = &fat_mnt[i];
-            nmmgr_handler_remove(&mnt->vfsh->nmmgr);
-            fs_fat_free(mnt);
-        }
-    }
     initted = 0;
     return 0;
 }

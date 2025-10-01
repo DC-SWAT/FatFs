@@ -84,6 +84,7 @@ static bool mount_sd_card(uint8_t *mbr_buf) {
     char path[8];
     kos_blockdev_t *dev;
     const char *prefix = "/sd";
+    bool mounted = false;
 
     if (sd_dev == NULL) {
         sd_dev = malloc(sizeof(kos_blockdev_t) * MAX_PARTITIONS);
@@ -139,7 +140,7 @@ static bool mount_sd_card(uint8_t *mbr_buf) {
                     dev->shutdown(dev);
                 }
                 else {
-                    return true;
+                    mounted = true;
                 }
             }
         }
@@ -149,7 +150,7 @@ static bool mount_sd_card(uint8_t *mbr_buf) {
         }
     }
 
-    return false;
+    return mounted;
 }
 
 int fs_fat_mount_sd() {
@@ -275,7 +276,7 @@ int fs_fat_mount_ide() {
             dbglog(DBG_INFO, "FATFS: Detected FAT%d on partition %d\n", fat_part, part);
 
             if (fs_fat_init()) {
-                dbglog(DBG_INFO, "FATFS: Could not initialize fs_fat!\n");
+                dbglog(DBG_INFO, "FATFS: Could not initialize fatfs!\n");
                 dev->shutdown(dev);
             }
             else {
