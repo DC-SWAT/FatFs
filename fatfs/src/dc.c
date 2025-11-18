@@ -730,6 +730,7 @@ static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, 
     size_t len = strlen(path);
     (void)flag;
 
+    memset(&inf, 0, sizeof(inf));
     memset(st, 0, sizeof(struct stat));
     st->st_dev = (dev_t)((uintptr_t)vfs);
     st->st_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IXUSR | S_IXGRP | S_IXOTH;
