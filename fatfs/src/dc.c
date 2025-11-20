@@ -33,6 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include <arch/rtc.h>
 #include <dc/g1ata.h>
@@ -724,6 +725,24 @@ static int fat_fcntl(void *hnd, int cmd, va_list ap) {
     return rv;
 }
 
+static time_t fat_datetime_to_unix(WORD fdate, WORD ftime) {
+    struct tm tm_time;
+
+    if (fdate == 0 && ftime == 0) {
+        return 0;
+    }
+    memset(&tm_time, 0, sizeof(tm_time));
+
+    tm_time.tm_sec = (ftime & 0x1F) * 2;
+    tm_time.tm_min = (ftime >> 5) & 0x3F;
+    tm_time.tm_hour = (ftime >> 11) & 0x1F;
+    tm_time.tm_mday = fdate & 0x1F;
+    tm_time.tm_mon = ((fdate >> 5) & 0x0F) - 1;
+    tm_time.tm_year = ((fdate >> 9) & 0x7F) + 80;
+
+    return mktime(&tm_time);
+}
+
 static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, int flag) {
     FILINFO inf;
     FAT_GET_MNT();
@@ -737,7 +756,7 @@ static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, 
     st->st_nlink = 1;
 
     /* Root directory */
-    if (len == 0 || (len == 1 && *path == '/')) {
+    if (len == 0 || (len == 1 && *path == '/') || (len > 1 && path[len - 1] == '.')) {
         st->st_mode |= S_IFDIR;
         st->st_size = -1;
         return 0;
@@ -747,10 +766,9 @@ static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, 
         goto error;
     }
 
-    // FIXME
-    st->st_atime = inf.fdate + inf.ftime;
-    st->st_mtime = inf.fdate + inf.ftime;
-    st->st_ctime = inf.fdate + inf.ftime;
+    st->st_atime = fat_datetime_to_unix(inf.fdate, inf.ftime);
+    st->st_mtime = st->st_atime;
+    st->st_ctime = st->st_atime;
 
     if (inf.fattrib & AM_DIR) {
         st->st_mode |= S_IFDIR;
