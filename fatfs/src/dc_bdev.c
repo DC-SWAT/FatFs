@@ -171,7 +171,7 @@ int fs_fat_mount_sd() {
 
     if (sd_init_ex(&params) == 0) {
         dbglog(DBG_INFO, "FATFS: SD card found on SCIF-SPI: %"PRIu32" MB\n",
-            (uint32)(sd_get_size() / 1024 / 1024));
+            (uint32_t)(sd_get_size() / 1024 / 1024));
 
         if (sd_read_blocks(0, 1, mbr_buffer) == 0) {
             if (mount_sd_card(mbr_buffer)) {
@@ -191,7 +191,7 @@ int fs_fat_mount_sd() {
 
     if (sd_init_ex(&params) == 0) {
         dbglog(DBG_INFO, "FATFS: SD card found on SCI-SPI: %"PRIu32" MB\n",
-            (uint32)(sd_get_size() / 1024 / 1024));
+            (uint32_t)(sd_get_size() / 1024 / 1024));
 
         if (sd_read_blocks(0, 1, mbr_buffer) == 0) {
             if (mount_sd_card(mbr_buffer)) {
