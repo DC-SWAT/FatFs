@@ -482,7 +482,7 @@ static size_t fat_total(void *hnd) {
     return (size_t)f_size(&sf->fil);
 }
 
-static dirent_t *fat_readdir(void *hnd) {
+static const dirent_t *fat_readdir(void *hnd) {
     FILINFO inf;
     FRESULT rc;
     FAT_GET_HND(hnd, NULL);
