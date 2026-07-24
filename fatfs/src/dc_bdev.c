@@ -322,8 +322,10 @@ void fs_fat_unmount_sd(void) {
                 else {
                     sprintf(path, "/sd%d", i);
                 }
-                fs_fat_unmount(path);
-                sd_dev[i].shutdown(&sd_dev[i]);
+                if (fs_fat_unmount(path) < 0) {
+                    sd_dev[i].shutdown(&sd_dev[i]);
+                }
+                sd_dev[i].dev_data = NULL;
             }
         }
         free(sd_dev);
@@ -343,8 +345,16 @@ void fs_fat_unmount_ide(void) {
                 else {
                     sprintf(path, "/ide%d", i);
                 }
-                fs_fat_unmount(path);
-                g1_dev[i].shutdown(&g1_dev[i]);
+                if (fs_fat_unmount(path) < 0) {
+                    g1_dev[i].shutdown(&g1_dev[i]);
+                    if (g1_dev_dma != NULL && g1_dev_dma[i].dev_data != NULL) {
+                        g1_dev_dma[i].shutdown(&g1_dev_dma[i]);
+                    }
+                }
+                g1_dev[i].dev_data = NULL;
+                if (g1_dev_dma != NULL) {
+                    g1_dev_dma[i].dev_data = NULL;
+                }
             }
         }
         free(g1_dev);
@@ -352,11 +362,6 @@ void fs_fat_unmount_ide(void) {
     }
 
     if (g1_dev_dma != NULL) {
-        for (int i = 0; i < MAX_PARTITIONS; i++) {
-            if (g1_dev_dma[i].dev_data != NULL) {
-                g1_dev_dma[i].shutdown(&g1_dev_dma[i]);
-            }
-        }
         free(g1_dev_dma);
         g1_dev_dma = NULL;
     }
