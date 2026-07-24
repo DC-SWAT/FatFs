@@ -508,7 +508,7 @@ static const dirent_t *fat_readdir(void *hnd) {
     }
 
     if (!*inf.lfname) {
-        strncpy(sf->dent.name, inf.fname, 12);
+        snprintf(sf->dent.name, sizeof(sf->dent.name), "%s", inf.fname);
     }
 
     // TODO: date and time parsing
