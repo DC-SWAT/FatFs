@@ -5,7 +5,7 @@
  * module for small embedded systems. This version has been ported and
  * optimized specifically for the Sega Dreamcast platform.
  *
- * Copyright (c) 2007-2025 Ruslan Rostovtsev
+ * Copyright (c) 2007-2026 Ruslan Rostovtsev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -60,6 +60,7 @@ typedef struct fatfs_mnt {
 
     DSTATUS dev_stat;
     BYTE dev_id;
+    int io_dirty;
 
     TCHAR dev_path[16];
 
@@ -260,7 +261,7 @@ static void *fat_open(vfs_handler_t *vfs, const char *fn, int flags) {
     fatfs_t *sf;
     fatfs_mnt_t *mnt;
     FRESULT rc;
-    int fat_flags = 0, mode = (flags & O_MODE_MASK);
+    int fat_flags = 0, mode = (flags & (O_RDONLY | O_WRONLY | O_RDWR));
 
     FAT_LOCK_SCOPED();
     mnt = (fatfs_mnt_t *)vfs->privdata;
@@ -351,7 +352,7 @@ static void *fat_open(vfs_handler_t *vfs, const char *fn, int flags) {
 
     if ((flags & O_APPEND) && sf->fil.fsize > 0) {
         DBG((DBG_ERROR, "FATFS: Append file...\n"));
-        f_lseek(&sf->fil, sf->fil.fsize - 1);
+        f_lseek(&sf->fil, sf->fil.fsize);
     }
 
     sf->used = 1;
@@ -426,6 +427,15 @@ static ssize_t fat_write(void *hnd, const void *buffer, size_t cnt) {
     UINT bw = 0;
     FRESULT rc;
     FAT_GET_HND(hnd, -1);
+
+    if (sf->mode & O_APPEND) {
+        rc = f_lseek(&sf->fil, sf->fil.fsize);
+        if (rc != FR_OK) {
+            put_rc(rc, __func__);
+            fatfs_set_errno(rc);
+            return -1;
+        }
+    }
 
     rc = f_write(&sf->fil, buffer, (UINT) cnt, &bw);
 
@@ -880,6 +890,10 @@ DRESULT disk_read (
     int rv;
 
     if (count > 1 && mnt->dev_dma) {
+        if (mnt->io_dirty) {
+            mnt->dev->flush(mnt->dev);
+            mnt->io_dirty = 0;
+        }
         if (((uintptr_t)buff & 31) == 0) {
             dev = mnt->dev_dma;
         }
@@ -954,6 +968,9 @@ DRESULT disk_write (
             errno));
         return errno == EOVERFLOW ? RES_PARERR : RES_ERROR;
     }
+    if (mnt->dev_dma) {
+        mnt->io_dirty = 1;
+    }
     return RES_OK;
 }
 #endif
@@ -974,6 +991,7 @@ DRESULT disk_ioctl (
     switch (cmd) {
         case CTRL_SYNC:
             mnt->dev->flush(mnt->dev);
+            mnt->io_dirty = 0;
             DBG((DBG_DEBUG, "FATFS: %s[%d] Sync\n", __func__, pdrv));
             return RES_OK;
         case GET_SECTOR_COUNT:
@@ -1212,6 +1230,24 @@ int fs_fat_unmount(const char *mp) {
     }
 
     if (found) {
+        for (i = 0; i < MAX_FAT_FILES; i++) {
+            if (!fh[i].used || fh[i].mnt != mnt) {
+                continue;
+            }
+            fh[i].used = 0;
+            switch (fh[i].type) {
+                case STAT_TYPE_FILE:
+                    if (fh[i].fil.cltbl != (DWORD *)&fh[i].lktbl && fh[i].fil.cltbl != NULL) {
+                        free(fh[i].fil.cltbl);
+                    }
+                    f_close(&fh[i].fil);
+                    break;
+                case STAT_TYPE_DIR:
+                    f_closedir(&fh[i].dir);
+                    break;
+            }
+        }
+        f_mount(NULL, mnt->dev_path, 0);
         nmmgr_handler_remove(&mnt->vfsh->nmmgr);
         fs_fat_free(mnt);
     }

@@ -1094,7 +1094,7 @@ DWORD contiguous_sect(
 	tbl = fp->cltbl + 1;	/* Top of CLMT */
 
 	if (!fp->clust) {
-		return *tbl * fp->fs->csize;
+		return (*tbl * fp->fs->csize) - csect;
 	}
 
 	for (;;) {
@@ -1109,7 +1109,11 @@ DWORD contiguous_sect(
 		tbl++;
 	}
 
-	return ((ncl - (fp->clust - tcl)) * fp->fs->csize) - csect;
+	ncl = ncl - (fp->clust - tcl);
+	if (ncl == 0) {
+		return 0;
+	}
+	return (ncl * fp->fs->csize) - csect;
 }
 
 #endif	/* _USE_FASTSEEK */
