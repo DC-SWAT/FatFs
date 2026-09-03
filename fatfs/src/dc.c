@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <time.h>
 
+#include <arch/arch.h>
 #include <arch/rtc.h>
 #include <dc/g1ata.h>
 #include <dc/sd.h>
@@ -941,8 +942,12 @@ DRESULT disk_write (
     uint8_t *src = (uint8_t *)buff;
     kos_blockdev_t *dev = mnt->dev;
     int rv;
-#if 0 /* FIXME: DMA write breaks GD-drive syscalls (?) */
-    if (count > 1 && mnt->dev_dma) {
+
+    if (hardware_sys_mode(NULL) == HW_TYPE_NAOMI && mnt->dev_dma) {
+        if (mnt->io_dirty) {
+            mnt->dev->flush(mnt->dev);
+            mnt->io_dirty = 0;
+        }
         if (((uintptr_t)buff & 31) == 0) {
             dev = mnt->dev_dma;
         }
@@ -954,7 +959,6 @@ DRESULT disk_write (
         }
 #endif
     }
-#endif
     DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d %p %p\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
         sector, (int)count, (const void *)buff, (const void *)src));
