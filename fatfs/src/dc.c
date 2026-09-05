@@ -319,20 +319,32 @@ static void *fat_open(vfs_handler_t *vfs, const char *fn, int flags) {
     }
 
     /* File */
-    switch (mode) {
-        case O_RDONLY:
-            fat_flags = (FA_OPEN_EXISTING | FA_READ);
-            break;
-        case O_WRONLY:
-            fat_flags = FA_WRITE | (flags & O_TRUNC ? FA_CREATE_ALWAYS : FA_CREATE_NEW);
-            break;
-        case O_RDWR:
-            fat_flags = (FA_WRITE | FA_READ) | (flags & O_TRUNC ? FA_CREATE_ALWAYS : FA_CREATE_NEW);
-            break;
-        default:
-            DBG((DBG_ERROR, "FATFS: Uknown flags\n"));
-            errno = EINVAL;
-            return NULL;
+    if (mode == O_RDWR) {
+        fat_flags = FA_READ | FA_WRITE;
+    }
+    else if (mode == O_WRONLY) {
+        fat_flags = FA_WRITE;
+    }
+    else if (mode == O_RDONLY) {
+        fat_flags = FA_READ;
+    }
+    else {
+        DBG((DBG_ERROR, "FATFS: Uknown flags\n"));
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+        fat_flags |= FA_CREATE_NEW;
+    }
+    else if (flags & O_TRUNC) {
+        fat_flags |= FA_CREATE_ALWAYS;
+    }
+    else if (flags & O_CREAT) {
+        fat_flags |= FA_OPEN_ALWAYS;
+    }
+    else {
+        fat_flags |= FA_OPEN_EXISTING;
     }
 
     DBG((DBG_DEBUG, "FATFS: Opening file - %s%s 0x%02x\n", mnt->dev_path, fn, (uint8)(fat_flags & 0xff)));
