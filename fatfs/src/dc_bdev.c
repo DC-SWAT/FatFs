@@ -41,6 +41,8 @@
 #include <kos/dbglog.h>
 #include <fatfs.h>
 
+#include "ffconf.h"
+
 #define MAX_PARTITIONS 4
 
 static kos_blockdev_t *sd_dev = NULL;
@@ -55,8 +57,25 @@ static int is_fat_partition(uint8_t partition_type) {
         case 0x0B:
         case 0x0C:
             return 32;
+#if FF_FS_EXFAT
+        case 0x07: /* Microsoft / exFAT (also NTFS) */
+            return 64;
+#endif
         default:
             return 0;
+    }
+}
+
+static const char *fat_fs_name(int fat_part) {
+    switch (fat_part) {
+        case 16:
+            return "FAT16";
+        case 32:
+            return "FAT32";
+        case 64:
+            return "exFAT";
+        default:
+            return "FAT";
     }
 }
 
@@ -78,6 +97,24 @@ static int check_partition(uint8_t *buf, int partition) {
     return 0;
 }
 
+#if FF_LBA64
+static bool mbr_is_gpt(const uint8_t *buf) {
+    if (buf[0x01FE] != 0x55 || buf[0x1FF] != 0xAA) {
+        return false;
+    }
+    return buf[0x01BE + 4] == 0xEE;
+}
+#endif
+
+static void make_mount_path(char *path, const char *prefix, int part) {
+    if (part == 0) {
+        strcpy(path, prefix);
+    }
+    else {
+        sprintf(path, "%s%d", prefix, part);
+    }
+}
+
 static bool mount_sd_card(uint8_t *mbr_buf) {
     uint8_t partition_type;
     int part = 0, fat_part = 0;
@@ -97,6 +134,35 @@ static bool mount_sd_card(uint8_t *mbr_buf) {
         memset(sd_dev, 0, sizeof(kos_blockdev_t) * MAX_PARTITIONS);
     }
 
+#if FF_LBA64
+    if (mbr_is_gpt(mbr_buf)) {
+        dbglog(DBG_INFO, "FATFS: Detected GPT on SD card\n");
+        for (part = 0; part < MAX_PARTITIONS; part++) {
+            dev = &sd_dev[part];
+            if (sd_blockdev_for_device(dev)) {
+                if (part == 0) {
+                    return false;
+                }
+                break;
+            }
+            make_mount_path(path, prefix, part);
+            if (fs_fat_init()) {
+                dbglog(DBG_INFO, "FATFS: Could not initialize fatfs!\n");
+                dev->shutdown(dev);
+                return mounted;
+            }
+            dbglog(DBG_INFO, "FATFS: Mounting GPT volume to %s...\n", path);
+            if (fs_fat_mount(path, dev, NULL, part)) {
+                dbglog(DBG_INFO, "FATFS: Could not mount GPT volume %d.\n", part);
+                dev->shutdown(dev);
+                break;
+            }
+            mounted = true;
+        }
+        return mounted;
+    }
+#endif
+
     for (part = 0; part < MAX_PARTITIONS; part++) {
         dev = &sd_dev[part];
 
@@ -107,19 +173,14 @@ static bool mount_sd_card(uint8_t *mbr_buf) {
             continue;
         }
 
-        if (part == 0) {
-            strcpy(path, prefix);
-        }
-        else {
-            sprintf(path, "%s%d", prefix, part);
-        }
+        make_mount_path(path, prefix, part);
 
         /* Check to see if the MBR says that we have a FAT partition. */
         fat_part = is_fat_partition(partition_type);
 
         if (fat_part) {
 
-            dbglog(DBG_INFO, "FATFS: Detected FAT%d on partition %d\n", fat_part, part);
+            dbglog(DBG_INFO, "FATFS: Detected %s on partition %d\n", fat_fs_name(fat_part), part);
 
             if (fs_fat_init()) {
                 dbglog(DBG_INFO, "FATFS: Could not initialize fatfs!\n");
@@ -247,6 +308,41 @@ int fs_fat_mount_ide() {
     memset(&g1_dev[0], 0, sizeof(kos_blockdev_t) * MAX_PARTITIONS);
     memset(&g1_dev_dma[0], 0, sizeof(kos_blockdev_t) * MAX_PARTITIONS);
 
+#if FF_LBA64
+    if (mbr_is_gpt(buf)) {
+        dbglog(DBG_INFO, "FATFS: Detected GPT on G1 ATA\n");
+        for (part = 0; part < MAX_PARTITIONS; part++) {
+            dev = &g1_dev[part];
+            dev_dma = &g1_dev_dma[part];
+            if (g1_ata_blockdev_for_device(0, dev)) {
+                break;
+            }
+            if (g1_ata_blockdev_for_device(1, dev_dma)) {
+                dev_dma = NULL;
+            }
+            make_mount_path(path, "/ide", part);
+            if (fs_fat_init()) {
+                dbglog(DBG_INFO, "FATFS: Could not initialize fatfs!\n");
+                dev->shutdown(dev);
+                if (dev_dma) {
+                    dev_dma->shutdown(dev_dma);
+                }
+                return 0;
+            }
+            dbglog(DBG_INFO, "FATFS: Mounting GPT volume to %s...\n", path);
+            if (fs_fat_mount(path, dev, dev_dma, part)) {
+                dbglog(DBG_INFO, "FATFS: Could not mount GPT volume %d.\n", part);
+                dev->shutdown(dev);
+                if (dev_dma) {
+                    dev_dma->shutdown(dev_dma);
+                }
+                break;
+            }
+        }
+        return 0;
+    }
+#endif
+
     for (part = 0; part < MAX_PARTITIONS; part++) {
 
         dev = &g1_dev[part];
@@ -259,21 +355,14 @@ int fs_fat_mount_ide() {
             continue;
         }
 
-        if (!part) {
-            strcpy(path, "/ide");
-            path[4] = '\0';
-        }
-        else {
-            sprintf(path, "/ide%d", part);
-            path[strlen(path)] = '\0';
-        }
+        make_mount_path(path, "/ide", part);
 
         /* Check to see if the MBR says that we have a FAT partition. */
         fat_part = is_fat_partition(partition_type);
 
         if (fat_part) {
 
-            dbglog(DBG_INFO, "FATFS: Detected FAT%d on partition %d\n", fat_part, part);
+            dbglog(DBG_INFO, "FATFS: Detected %s on partition %d\n", fat_fs_name(fat_part), part);
 
             if (fs_fat_init()) {
                 dbglog(DBG_INFO, "FATFS: Could not initialize fatfs!\n");

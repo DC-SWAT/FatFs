@@ -44,11 +44,10 @@
 #include <kos/mutex.h>
 #include <fatfs.h>
 
-#include "diskio.h"
 #include "ff.h"
-#include "integer.h"
+#include "diskio.h"
 
-#define MAX_FAT_MOUNTS        _VOLUMES
+#define MAX_FAT_MOUNTS        FF_VOLUMES
 #define MAX_FAT_FILES         16
 #define FATFS_LINK_TBL_SIZE   32
 
@@ -95,7 +94,7 @@ static int initted = 0;
 static fatfs_t fh[MAX_FAT_FILES] __attribute__((aligned(32)));
 static fatfs_mnt_t fat_mnt[MAX_FAT_MOUNTS] __attribute__((aligned(32)));
 
-#if _MULTI_PARTITION	/* Volume - Partition resolution table */
+#if FF_MULTI_PARTITION	/* Volume - Partition resolution table */
 
 /* Physical drive number; Partition: 0:Auto detect, 1-4:Forced partition) */
 
@@ -190,7 +189,7 @@ static void fatfs_set_errno(FRESULT rc) {
         case FR_NOT_ENOUGH_CORE:		/* (17) LFN working buffer could not be allocated */
             errno = ENOMEM;
             break;
-        case FR_TOO_MANY_OPEN_FILES:	/* (18) Number of open files > _FS_SHARE */
+        case FR_TOO_MANY_OPEN_FILES:	/* (18) Number of open files > FF_FS_LOCK */
             errno = EMFILE;
             break;
         case FR_INVALID_PARAMETER:	/* (19) Given parameter is invalid */
@@ -347,7 +346,7 @@ static void *fat_open(vfs_handler_t *vfs, const char *fn, int flags) {
         fat_flags |= FA_OPEN_EXISTING;
     }
 
-    DBG((DBG_DEBUG, "FATFS: Opening file - %s%s 0x%02x\n", mnt->dev_path, fn, (uint8)(fat_flags & 0xff)));
+    DBG((DBG_DEBUG, "FATFS: Opening file - %s%s 0x%02x\n", mnt->dev_path, fn, (uint8_t)(fat_flags & 0xff)));
 
     sf->type = STAT_TYPE_FILE;
     rc = f_open(&sf->fil, (const TCHAR*)(fn == NULL ? "/" : fn), fat_flags);
@@ -363,9 +362,9 @@ static void *fat_open(vfs_handler_t *vfs, const char *fn, int flags) {
         f_sync(&sf->fil);
     }
 
-    if ((flags & O_APPEND) && sf->fil.fsize > 0) {
+    if ((flags & O_APPEND) && f_size(&sf->fil) > 0) {
         DBG((DBG_ERROR, "FATFS: Append file...\n"));
-        f_lseek(&sf->fil, sf->fil.fsize);
+        f_lseek(&sf->fil, f_size(&sf->fil));
     }
 
     sf->used = 1;
@@ -413,7 +412,7 @@ static ssize_t fat_read(void *hnd, void *buffer, size_t size) {
 
     if (sf->fil.cltbl == NULL &&
         (sf->mode & O_MODE_MASK) == O_RDONLY &&
-        f_size(&sf->fil) > (DWORD)(sf->mnt->fs->csize * (1 << sf->mnt->dev->l_block_size)))
+        f_size(&sf->fil) > (FSIZE_t)(sf->mnt->fs->csize * (1 << sf->mnt->dev->l_block_size)))
     {
         /* Using fast seek feature for files larger than the cluster size */
         rc = fat_create_linkmap(sf);
@@ -442,7 +441,7 @@ static ssize_t fat_write(void *hnd, const void *buffer, size_t cnt) {
     FAT_GET_HND(hnd, -1);
 
     if (sf->mode & O_APPEND) {
-        rc = f_lseek(&sf->fil, sf->fil.fsize);
+        rc = f_lseek(&sf->fil, f_size(&sf->fil));
         if (rc != FR_OK) {
             put_rc(rc, __func__);
             fatfs_set_errno(rc);
@@ -468,27 +467,25 @@ static off_t fat_tell(void * hnd) {
     return (off_t)f_tell(&sf->fil);
 }
 
-static off_t fat_seek(void *hnd, off_t offset, int whence) {
+static _off64_t fat_seek64(void *hnd, _off64_t offset, int whence) {
     FRESULT rc;
-    DWORD off;
+    FSIZE_t off;
     FAT_GET_HND(hnd, -1);
 
     switch (whence) {
         case SEEK_SET:
-            off = (DWORD) offset;
+            off = (FSIZE_t) offset;
             break;
         case SEEK_CUR:
-            off = (DWORD) (sf->fil.fptr + offset);
+            off = (FSIZE_t) (f_tell(&sf->fil) + offset);
             break;
         case SEEK_END:
-            off = (DWORD) (sf->fil.fsize + offset);
+            off = (FSIZE_t) (f_size(&sf->fil) + offset);
             break;
         default:
             errno = EINVAL;
             return -1;
     }
-
-//	DBG((DBG_DEBUG, "FATFS: Seeking: whence=%d req=%ld res=%ld\n", whence, offset, off));
 
     rc = f_lseek(&sf->fil, off);
 
@@ -497,7 +494,21 @@ static off_t fat_seek(void *hnd, off_t offset, int whence) {
         fatfs_set_errno(rc);
         return -1;
     }
-    return (off_t) sf->fil.fptr;
+    return (_off64_t) f_tell(&sf->fil);
+}
+
+static off_t fat_seek(void *hnd, off_t offset, int whence) {
+    return (off_t) fat_seek64(hnd, (_off64_t) offset, whence);
+}
+
+static _off64_t fat_tell64(void *hnd) {
+    FAT_GET_HND(hnd, -1);
+    return (_off64_t) f_tell(&sf->fil);
+}
+
+static uint64_t fat_total64(void *hnd) {
+    FAT_GET_HND(hnd, -1);
+    return (uint64_t) f_size(&sf->fil);
 }
 
 static size_t fat_total(void *hnd) {
@@ -511,11 +522,7 @@ static const dirent_t *fat_readdir(void *hnd) {
     FAT_GET_HND(hnd, NULL);
 
     memset(&sf->dent, 0, sizeof(dirent_t));
-
-#if _USE_LFN
-    inf.lfname = sf->dent.name;
-    inf.lfsize = NAME_MAX;
-#endif
+    memset(&inf, 0, sizeof(inf));
 
     rc = f_readdir(&sf->dir, &inf);
 
@@ -530,9 +537,7 @@ static const dirent_t *fat_readdir(void *hnd) {
         return NULL;
     }
 
-    if (!*inf.lfname) {
-        snprintf(sf->dent.name, sizeof(sf->dent.name), "%s", inf.fname);
-    }
+    snprintf(sf->dent.name, sizeof(sf->dent.name), "%s", inf.fname);
 
     // TODO: date and time parsing
     sf->dent.time = (time_t) inf.ftime;
@@ -543,7 +548,7 @@ static const dirent_t *fat_readdir(void *hnd) {
     }
     else {
         sf->dent.attr = 0;
-        sf->dent.size = inf.fsize;
+        sf->dent.size = (int) inf.fsize;
     }
 
     return &sf->dent;
@@ -565,9 +570,6 @@ static int fat_rewinddir(void *hnd) {
     return 0;
 }
 
-/* !=0: Sector number, 0: Failed - invalid cluster# */
-DWORD clust2sect(FATFS *fs, DWORD clst);
-
 static int fat_ioctl(void *hnd, int cmd, va_list ap) {
     DRESULT rc = RES_OK;
     FAT_GET_HND(hnd, -1);
@@ -575,14 +577,14 @@ static int fat_ioctl(void *hnd, int cmd, va_list ap) {
 
     switch (cmd) {
         case FATFS_IOCTL_GET_BOOT_SECTOR_DATA:
-            rc = disk_read(sf->fil.fs->drv, (BYTE *)data, 0, 1);
+            rc = disk_read(sf->fil.obj.fs->pdrv, (BYTE *)data, 0, 1);
             break;
         case FATFS_IOCTL_GET_FD_LBA:
         {
-            DWORD lba = clust2sect(sf->fil.fs, sf->fil.sclust);
+            LBA_t lba = clst2sect(sf->fil.obj.fs, sf->fil.obj.sclust);
 
             if (lba > 0) {
-                *(uint32_t *)data = lba;
+                *(uint64_t *)data = (uint64_t) lba;
                 rc = RES_OK;
             }
             else {
@@ -602,7 +604,7 @@ static int fat_ioctl(void *hnd, int cmd, va_list ap) {
             break;
         }
         default:
-            rc = disk_ioctl(sf->fil.fs->drv, (BYTE)cmd, data);
+            rc = disk_ioctl(sf->fil.obj.fs->pdrv, (BYTE)cmd, data);
             break;
     }
 
@@ -799,9 +801,9 @@ static int fat_stat(struct vfs_handler *vfs, const char *path, struct stat *st, 
     }
     else {
         st->st_mode |= S_IFREG;
-        st->st_size = inf.fsize;
+        st->st_size = (off_t) inf.fsize;
         st->st_blksize = 1 << mnt->dev->l_block_size;
-        st->st_blocks = inf.fsize >> mnt->dev->l_block_size;
+        st->st_blocks = (off_t) (inf.fsize >> mnt->dev->l_block_size);
 
         if (inf.fsize & (st->st_blksize - 1)) {
             ++st->st_blocks;
@@ -831,10 +833,10 @@ static int fat_fstat(void *hnd, struct stat *st) {
     }
     else {
         st->st_mode |= S_IFREG;
-        st->st_size = sf->fil.fsize;
-        st->st_blocks = sf->fil.fsize >> sf->mnt->dev->l_block_size;
+        st->st_size = (off_t) f_size(&sf->fil);
+        st->st_blocks = f_size(&sf->fil) >> sf->mnt->dev->l_block_size;
 
-        if (sf->fil.fsize & (st->st_blksize - 1)) {
+        if (f_size(&sf->fil) & (st->st_blksize - 1)) {
             ++st->st_blocks;
         }
     }
@@ -894,7 +896,7 @@ DSTATUS disk_status (
 DRESULT disk_read (
     BYTE pdrv,		/* Physical drive nmuber (0..) */
     BYTE *buff,		/* Data buffer to store read data */
-    DWORD sector,	/* Sector address (LBA) */
+    LBA_t sector,	/* Sector address (LBA) */
     UINT count		/* Number of sectors to read */
 ) {
     FAT_GET_MOUNT();
@@ -918,9 +920,9 @@ DRESULT disk_read (
 #endif
     }
 
-    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d %p %p\n",
+    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %" PRIu64 " %d %p %p\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
-        sector, (int)count, (void *)buff, (void *)dest));
+        (uint64_t) sector, (int)count, (void *)buff, (void *)dest));
 
     rv = dev->read_blocks(dev, sector, count, dest);
 
@@ -943,11 +945,10 @@ DRESULT disk_read (
 /* Write Sector(s)                                                       */
 /*-----------------------------------------------------------------------*/
 
-#if _USE_WRITE
 DRESULT disk_write (
     BYTE pdrv,			/* Physical drive nmuber (0..) */
     const BYTE *buff,	/* Data to be written */
-    DWORD sector,		/* Sector address (LBA) */
+    LBA_t sector,		/* Sector address (LBA) */
     UINT count			/* Number of sectors to write */
 ) {
     FAT_GET_MOUNT();
@@ -971,9 +972,9 @@ DRESULT disk_write (
         }
 #endif
     }
-    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %ld %d %p %p\n",
+    DBG((DBG_DEBUG, "FATFS: %s[%d] %s %" PRIu64 " %d %p %p\n",
         __func__, pdrv, (dev == mnt->dev_dma ? "dma" : "pio"),
-        sector, (int)count, (const void *)buff, (const void *)src));
+        (uint64_t) sector, (int)count, (const void *)buff, (const void *)src));
 
     rv = dev->write_blocks(dev, sector, count, src);
 
@@ -989,14 +990,12 @@ DRESULT disk_write (
     }
     return RES_OK;
 }
-#endif
 
 
 /*-----------------------------------------------------------------------*/
 /* Miscellaneous Functions                                               */
 /*-----------------------------------------------------------------------*/
 
-#if _USE_IOCTL
 DRESULT disk_ioctl (
     BYTE pdrv,		/* Physical drive nmuber (0..) */
     BYTE cmd,		/* Control code */
@@ -1011,16 +1010,16 @@ DRESULT disk_ioctl (
             DBG((DBG_DEBUG, "FATFS: %s[%d] Sync\n", __func__, pdrv));
             return RES_OK;
         case GET_SECTOR_COUNT:
-            *(ulong*)buff = mnt->dev->count_blocks(mnt->dev);
-            DBG((DBG_DEBUG, "FATFS: %s[%d] Sector count: %d\n", __func__, pdrv, *(ushort*)buff));
+            *(LBA_t *)buff = (LBA_t) mnt->dev->count_blocks(mnt->dev);
+            DBG((DBG_DEBUG, "FATFS: %s[%d] Sector count: %" PRIu64 "\n", __func__, pdrv, (uint64_t)*(LBA_t *)buff));
             return RES_OK;
         case GET_SECTOR_SIZE:
-            *(ushort*)buff = (1 << mnt->dev->l_block_size);
-            DBG((DBG_DEBUG, "FATFS: %s[%d] Sector size: %d\n", __func__, pdrv, *(ushort*)buff));
+            *(WORD *)buff = (1 << mnt->dev->l_block_size);
+            DBG((DBG_DEBUG, "FATFS: %s[%d] Sector size: %d\n", __func__, pdrv, *(WORD *)buff));
             return RES_OK;
         case GET_BLOCK_SIZE:
-            *(ushort*)buff = (1 << mnt->dev->l_block_size);
-            DBG((DBG_DEBUG, "FATFS: %s[%d] Block size: %d\n", __func__, pdrv, *(ushort*)buff));
+            *(WORD *)buff = (1 << mnt->dev->l_block_size);
+            DBG((DBG_DEBUG, "FATFS: %s[%d] Block size: %d\n", __func__, pdrv, *(WORD *)buff));
             return RES_OK;
         case CTRL_TRIM:
             DBG((DBG_DEBUG, "FATFS: %s[%d] Trim sector\n", __func__, pdrv));
@@ -1030,7 +1029,6 @@ DRESULT disk_ioctl (
             return RES_PARERR;
     }
 }
-#endif
 
 DWORD get_fattime() {
     struct tm *time;
@@ -1084,9 +1082,9 @@ static vfs_handler_t vh = {
     NULL,               /* poll */
     NULL,               /* link */
     NULL,               /* symlink */
-    NULL,               /* seek64 */
-    NULL,               /* tell64 */
-    NULL,               /* total64 */
+    fat_seek64,         /* seek64 */
+    fat_tell64,         /* tell64 */
+    fat_total64,        /* total64 */
     NULL,               /* readlink */
     fat_rewinddir,      /* rewinddir */
     fat_fstat           /* fstat */
@@ -1213,9 +1211,9 @@ int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio, kos_blockdev_t *dev_dm
                 (uint32_t)((fre_sect * sect_size) / 1024 / 1024));
     }
 
-    DBG((DBG_DEBUG, "FATFS: FAT start sector: %ld\n", mnt->fs->fatbase));
-    DBG((DBG_DEBUG, "FATFS: Data start sector: %ld\n", mnt->fs->database));
-    DBG((DBG_DEBUG, "FATFS: Root directory start sector:  %ld\n", mnt->fs->dirbase * mnt->fs->csize));
+    DBG((DBG_DEBUG, "FATFS: FAT start sector: %" PRIu64 "\n", (uint64_t) mnt->fs->fatbase));
+    DBG((DBG_DEBUG, "FATFS: Data start sector: %" PRIu64 "\n", (uint64_t) mnt->fs->database));
+    DBG((DBG_DEBUG, "FATFS: Root directory start sector:  %" PRIu64 "\n", (uint64_t) mnt->fs->dirbase * mnt->fs->csize));
 
     /* Register with the VFS */
     if (nmmgr_handler_add(&mnt->vfsh->nmmgr)) {

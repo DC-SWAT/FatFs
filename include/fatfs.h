@@ -1,11 +1,11 @@
 /*
- * FatFs for the Sega Dreamcast
+ * FatFs for the Sega Dreamcast and NAOMI
  *
  * This file is part of the FatFs module, a generic FAT filesystem
  * module for small embedded systems. This version has been ported and
- * optimized specifically for the Sega Dreamcast platform.
+ * optimized specifically for the Sega Dreamcast and NAOMI.
  *
- * Copyright (c) 2007-2025 Ruslan Rostovtsev
+ * Copyright (c) 2007-2026 Ruslan Rostovtsev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
  */
 
 /** \file   fatfs.h
-    \brief  FatFs for the Sega Dreamcast.
+    \brief  FatFs R0.16 for the Sega Dreamcast and NAOMI (FAT/FAT32/exFAT).
     \author Ruslan Rostovtsev
 */
 #ifndef _FATFS_H
@@ -37,49 +37,49 @@
 
 /**
  * \enum fatfs_ioctl_t
- * \brief FAT filesystem IOCTL commands.
+ * \brief FAT/exFAT filesystem IOCTL commands.
  */
 typedef enum fatfs_ioctl {
 
     FATFS_IOCTL_CTRL_SYNC = 0,        /**< Flush disk cache (for write functions). */
-    FATFS_IOCTL_GET_SECTOR_COUNT,     /**< Get media size (for f_mkfs()), 4-byte unsigned. */
-    FATFS_IOCTL_GET_SECTOR_SIZE,      /**< Get sector size (for multiple sector size (_MAX_SS >= 1024)), 2-byte unsigned. */
+    FATFS_IOCTL_GET_SECTOR_COUNT,     /**< Get media size (for f_mkfs()), 8-byte unsigned. */
+    FATFS_IOCTL_GET_SECTOR_SIZE,      /**< Get sector size (for multiple sector size (FF_MAX_SS >= 1024)), 2-byte unsigned. */
     FATFS_IOCTL_GET_BLOCK_SIZE,       /**< Get erase block size (for f_mkfs()), 2-byte unsigned. */
-    FATFS_IOCTL_CTRL_ERASE_SECTOR,    /**< Force erase a block of sectors (for _USE_ERASE). */
-    FATFS_IOCTL_GET_BOOT_SECTOR_DATA, /**< Get first sector data, ffconf.h _MAX_SS bytes. */
-    FATFS_IOCTL_GET_FD_LBA,           /**< Get file LBA, 4-byte unsigned. */
+    FATFS_IOCTL_CTRL_ERASE_SECTOR,    /**< Force erase a block of sectors (for FF_USE_TRIM). */
+    FATFS_IOCTL_GET_BOOT_SECTOR_DATA, /**< Get first sector data, FF_MAX_SS bytes. */
+    FATFS_IOCTL_GET_FD_LBA,           /**< Get file start LBA, 8-byte unsigned. */
     FATFS_IOCTL_GET_FD_LINK_MAP       /**< Get file clusters link map, 128+ bytes. */
 
 } fatfs_ioctl_t;
 
 /**
- * \brief Initialize the FAT filesystem.
+ * \brief Initialize the FAT/exFAT filesystem.
  *
  * \return 0 on success, or a negative value if an error occurred.
  */
 int fs_fat_init(void);
 
 /**
- * \brief Shutdown the FAT filesystem.
+ * \brief Shutdown the FAT/exFAT filesystem.
  *
  * \return 0 on success, or a negative value if an error occurred.
  */
 int fs_fat_shutdown(void);
 
 /**
- * \brief Mount the FAT filesystem on the specified partition.
+ * \brief Mount a FAT/exFAT volume on the specified partition.
  *
  * \param mp Mount point path.
  * \param dev_pio Pointer to the block device for PIO.
  * \param dev_dma Pointer to the block device for DMA.
- * \param partition Partition number (reset to 0 for start block).
+ * \param partition Partition index: MBR 0-3, or 0-based Microsoft Basic Data order on GPT.
  * \return 0 on success, or a negative value if an error occurred.
  */
 int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio,
     kos_blockdev_t *dev_dma, int partition);
 
 /**
- * \brief Unmount the FAT filesystem.
+ * \brief Unmount the FAT/exFAT filesystem.
  *
  * \param mp Mount point path.
  * \return 0 on success, or a negative value if an error occurred.
@@ -87,15 +87,15 @@ int fs_fat_mount(const char *mp, kos_blockdev_t *dev_pio,
 int fs_fat_unmount(const char *mp);
 
 /**
- * \brief Check if a mount point is using a FAT filesystem.
+ * \brief Check if a mount point is using a FAT/exFAT filesystem.
  *
  * \param mp Mount point path.
- * \return 0 if not FAT, 1 if FAT.
+ * \return 0 if not mounted as FAT/exFAT, otherwise a non-zero mount index.
  */
 int fs_fat_is_mounted(const char *mp);
 
 /**
- * \brief Initialize the FAT and SD card, then mount all partitions on it.
+ * \brief Initialize FAT/exFAT and SD card, then mount all partitions on it.
  * This function will try to detect and mount both SCIF and SCI interfaces
  * if they are available.
  *
@@ -109,7 +109,7 @@ int fs_fat_mount_sd(void);
 void fs_fat_unmount_sd(void);
 
 /**
- * \brief Initialize the FAT and IDE (G1-ATA), then mount all partitions on it.
+ * \brief Initialize FAT/exFAT and IDE (G1-ATA), then mount all partitions on it.
  *
  * \return 0 on success, or a negative value if an error occurred.
  */
