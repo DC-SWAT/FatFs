@@ -1288,6 +1288,36 @@ int fs_fat_is_mounted(const char *mp) {
     return found;
 }
 
+const char *fs_fat_get_type(const char *mp) {
+    int i;
+
+    FAT_LOCK_SCOPED();
+
+    for (i = 0; i < MAX_FAT_MOUNTS; ++i) {
+        if (fat_mnt[i].vfsh == NULL || fat_mnt[i].fs == NULL) {
+            continue;
+        }
+        if (strcmp(mp, fat_mnt[i].vfsh->nmmgr.pathname)) {
+            continue;
+        }
+
+        switch (fat_mnt[i].fs->fs_type) {
+            case FS_FAT12:
+                return "FAT12";
+            case FS_FAT16:
+                return "FAT16";
+            case FS_FAT32:
+                return "FAT32";
+            case FS_EXFAT:
+                return "exFAT";
+            default:
+                return "FAT";
+        }
+    }
+
+    return NULL;
+}
+
 
 int fs_fat_init(void) {
     if (initted) {

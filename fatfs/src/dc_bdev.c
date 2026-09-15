@@ -420,6 +420,8 @@ void fs_fat_unmount_sd(void) {
         free(sd_dev);
         sd_dev = NULL;
     }
+
+    sd_shutdown();
 }
 
 /* Unmount and cleanup IDE devices */
@@ -454,4 +456,6 @@ void fs_fat_unmount_ide(void) {
         free(g1_dev_dma);
         g1_dev_dma = NULL;
     }
+
+    g1_ata_shutdown();
 }

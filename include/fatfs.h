@@ -95,6 +95,14 @@ int fs_fat_unmount(const char *mp);
 int fs_fat_is_mounted(const char *mp);
 
 /**
+ * \brief Get the filesystem type name for a FAT/exFAT mount point.
+ *
+ * \param mp Mount point path.
+ * \return "FAT12", "FAT16", "FAT32", "exFAT", or NULL if not mounted.
+ */
+const char *fs_fat_get_type(const char *mp);
+
+/**
  * \brief Initialize FAT/exFAT and SD card, then mount all partitions on it.
  * This function will try to detect and mount both SCIF and SCI interfaces
  * if they are available.
